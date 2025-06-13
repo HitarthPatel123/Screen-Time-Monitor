@@ -21,7 +21,7 @@ typedef struct{
 
 AppUsage appUsages[MAX_APPS];
 int appCount=0;
-HWND hwndmain, hwndList, hwndTop5List, hwndIncButton, hwndDecButton;
+HWND hwndMain, hwndList, hwndTop5List, hwndIncButton, hwndDecButton;
 HINSTANCE hInstance;
 int selectedAppIndex=-1;
 
@@ -118,4 +118,157 @@ AppUsage* GetOrAddAppUsage(const char *processName, DWORD p_id){
         return &appUsages[appCount++];
     }
     return NULL;
+}
+
+BOOL InputBox(HWND hwndOwner, const char *title, const char *prompt, int *timeLimit){
+    char inputBuffer[32];
+    sprintf(inputBuffer, "%d", *timeLimit);
+
+    char message[256];
+    sprintf(message, "%s\n\nCurrent limit: %d seconds", prompt, *timeLimit);
+
+    int result=messageBox(hwndOwner, message, title, MB_OKCANCEL);
+    if(result == IDOK){
+        *timeLimit+=60;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+void UpdateTop5List(){
+    AppUsage top5[MAX_APPS];
+    memcpy(top5, appUsages, appCount * sizeof(AppUsage));
+
+    for(int i=0;i<appCount-1;i++){
+        for(int j=i+1;j<appCount;j++){
+            if(top5[i].timeSpent < top5[j].timeSpent){
+                AppUsage temp = top5[i];
+                top5[i] = top5[j];
+                top5[j] = temp;
+            }
+        }
+    }
+
+    SendMessage(hwndTop5List, LB_RESETCONTENT, 0, 0);
+    for(int i=0;i<5 && i<appCount;i++){
+        char buffer[256];
+        sprintf(buffer, "%s: %d sec", top5[i].appName, top5[i].timeSpent);
+        SendMessage(hwndTop5List, LB_ADDSTRING, 0, (LPARAM)buffer);
+    }
+}
+
+void UpdateUsageList(){
+    char buffer[256];
+    SendMessage(hwndTop5List, LB_RESETCONTENT, 0, 0);
+    for (int i = 0; i < appCount; i++) {
+        sprintf(buffer, "%s: %d sec (Limit: %d sec)", appUsages[i].appName, appUsages[i].timeSpent, appUsages[i].timeLimit);
+        SendMessage(hwndList, LB_ADDSTRING, 0, (LPARAM)buffer);
+    }
+    UpdateTop5List();
+}
+
+void AdjustTimeLimit(int adjustment){
+    if (selectedAppIndex >= 0 && selectedAppIndex < appCount){
+        appUsages[selectedAppIndex].timeLimit+=adjustment;
+        UpdateUsageList();
+    }
+}
+
+void HandleAppWarnings(AppUsage *appUsage){
+    if(appUsage->timeSpent >= appUsage->timeLimit && !appUsage->popUpShown){
+        appUsage->popUpShown = TRUE;
+
+        SetForegroundWindow(hwndMain);
+        KillTimer(hwndMain ,1);
+
+        int result=MessageBox(hwndMain, "Time limit exceeded. Do you want to close the app?",
+                              "Warning", MB_YESNOCANCEL | MB_ICONEXCLAMATION);
+
+        if(result == IDYES){
+            HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, appUsage->p_id);
+            if(hProcess){
+                TerminateProcess(hProcess, 0);
+                CloseHandle(hProcess);
+            }
+        }else if(result == IDCANCEL){
+            InputBox(hwndMain, "Adjust Time Limit", "Increase the time limit:", &appUsage->timeLimit);
+        }
+
+        SetTimer(hwndMain, 1, UPDATE_INTERVAL, NULL);
+        appUsage->popUpShown = FALSE;
+    }
+}
+
+void UpdateSelectionAndAdjustTimeLimit(HWND hwnd, WPARAM wParam){
+    if(HIWORD(wParam) == LBN_SELCHANGE){
+        selectedAppIndex = SendMessage(hwndList, LB_GETCURSEL, 0, 0);
+    }else if(LOWORD(wParam) == 1){
+        if(selectedAppIndex >= 0 && selectedAppIndex < appCount){
+            appUsages[selectedAppIndex].timeLimit -= 10;
+            UpdateUsageList();
+        }
+    }
+}
+
+LRESULT CALLBACK WindowProcess(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
+    switch(uMsg){
+        case WM_CREATE:
+    CreateWindow(
+         "STATIC", "App Usage Details",
+        WS_VISIBLE | WS_CHILD | SS_CENTER,
+        10, 0, 400, 20,
+        hwnd, NULL, hInstance, NULL
+    );
+
+    hwndList = CreateWindow(
+        "LISTBOX", NULL,
+        WS_VISIBLE | WS_CHILD | WS_BORDER | LBS_NOTIFY,
+        10, 20, 400, 180,
+        hwnd, NULL, hInstance, NULL
+    );
+    
+    CreateWindow(
+        "STATIC", "Most Used Apps",
+        WS_VISIBLE | WS_CHILD | SS_CENTER,
+        10, 210, 400, 20,
+        hwnd, NULL, hInstance, NULL
+    );
+
+    hwndTop5List = CreateWindow(
+        "LISTBOX", NULL,
+        WS_VISIBLE | WS_CHILD | WS_BORDER | LBS_NOTIFY,
+        10, 230, 400, 100,
+        hwnd, NULL, hInstance, NULL
+    );
+
+            hwndIncButton = CreateWindow("BUTTON", "+", WS_VISIBLE | WS_CHILD,
+                                        420, 10, 30, 30, hwnd, (HMENU)1, hInstance, NULL);
+            hwndDecButton = CreateWindow("BUTTON", "-", WS_VISIBLE | WS_CHILD,
+                                        420, 50, 30, 30, hwnd, (HMENU)2, hInstance, NULL);  
+            SetTimer(hwnd, 1, UPDATE_INTERVAL, NULL);
+            break;
+        case WM_COMMAND:
+            UpdateSelectionAndAdjustTimeLimit(hwnd, wParam);
+            break;
+        case WM_TIMER:
+            {
+                char processName[256]="";
+                DWORD p_id;
+                if(GetActiveProcessName(processName, sizeof(processName), &p_id) && IsUserApplication(p_id)){
+                    AppUsage *appUsage = GetOrAddAppUsage(processName, p_id);
+                    if(appUsage){
+                        appUsage->timeSpent++;
+                        HandleAppWarnings(appUsage);
+                        UpdateUsageList();
+                    }
+                }
+            }
+            break;
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            break;
+        default:
+            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+    return 0;
 }
