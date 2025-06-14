@@ -3,7 +3,7 @@
 #include<string.h>
 #include<tlhelp32.h>
 #include "resourcefile.h"
-#include<string.h>
+#include<stdio.h>
 
 
 
@@ -100,7 +100,7 @@ int GetActiveProcessName(char *processName, int size, DWORD *p_id){
 }
 
 AppUsage* GetOrAddAppUsage(const char *processName, DWORD p_id){
-    if(stcmp(processName, "AppUsageTracker,exe") == 0 || strcmp(processName,"ShellExperienceHost.exe") ==0 || strcmp(processName, "WindowsTerminal.exe") == 0 || strcmp(processName, "SearchHost.exe") == 0) {
+    if(strcmp(processName, "AppUsageTracker,exe") == 0 || strcmp(processName,"ShellExperienceHost.exe") ==0 || strcmp(processName, "WindowsTerminal.exe") == 0 || strcmp(processName, "SearchHost.exe") == 0) {
         return NULL;
     }
     for(int i=0;i<appCount;i++){
@@ -127,7 +127,7 @@ BOOL InputBox(HWND hwndOwner, const char *title, const char *prompt, int *timeLi
     char message[256];
     sprintf(message, "%s\n\nCurrent limit: %d seconds", prompt, *timeLimit);
 
-    int result=messageBox(hwndOwner, message, title, MB_OKCANCEL);
+    int result=MessageBox(hwndOwner, message, title, MB_OKCANCEL);
     if(result == IDOK){
         *timeLimit+=60;
         return TRUE;
@@ -269,6 +269,38 @@ LRESULT CALLBACK WindowProcess(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
             break;
         default:
             return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+    return 0;
+}
+
+
+int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
+    hInstance=hInst;
+    const char *CLASS_NAME = "AppUsageTracker";
+    WNDCLASS wc = {};
+
+    wc.lpfnWndProc = WindowProcess;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = CLASS_NAME;
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
+
+    RegisterClass(&wc);
+
+    hwndMain= CreateWindowEx(0, CLASS_NAME, "Application use Tracker", WS_OVERLAPPEDWINDOW,
+                            CW_USEDEFAULT, CW_USEDEFAULT, 500, 400, NULL, NULL, hInstance, NULL);
+    
+    if (hwndMain == NULL){
+        return 0;
+    }
+
+    ShowWindow(hwndMain, nCmdShow);
+
+    MSG msg = { };
+    while(GetMessage(&msg, NULL, 0, 0)){
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
     }
     return 0;
 }
