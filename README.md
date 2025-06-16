@@ -1,6 +1,6 @@
 # Screen-time-Monitor
 
-The **Screen Time Monitoring System** is a multi-platform application developed to help users track and control the duration of their device usage.The system enables users to keep an eye on active **application usage**, define **usage time limits**, and get **notified** when those limits are surpassed.Compatible with both **Windows** and **macOS**, it offers customized features specific to each OS.
+The **Screen Time Monitor** is a multi-platform application developed to help users track and control the duration of their device usage.The system enables users to keep an eye on active **application usage**, define **usage time limits**, and get **notified** when those limits are surpassed.Compatible with both **Windows** and **macOS**, it offers customized features specific to each OS.
 
 ---
 
