@@ -10,6 +10,7 @@
 using namespace std;
 using namespace std::chrono;
 
+// Structure for running application
 struct AppUsage {
     string appName;
     int usageLimit =- 1;
@@ -26,12 +27,14 @@ auto lastSwitchTime = steady_clock::now();
 bool running = true;
 mutex appUsageMutex;
 
+// Notification sent when application's usage limit is reached
 void Notify(const string& appName){
     string script = "osascript -e 'display notification \"" + appName + 
                     " has reached its usage limit.\" with title \"App Usage Limit Reached\"'";
     system(script.c_str());
 }
 
+// Terminates particular application
 void terminateApp(const string& appName){
     NSArray<NSRunningApplication *> *runningApps = [[NSWorkspace sharedWorkspace] runningApplications];
     for (NSRunningApplication *app in runningApps){
@@ -43,6 +46,7 @@ void terminateApp(const string& appName){
     }
 }
 
+// Display dialog box and terminate the application
 void showDialogAndTerminate(const string& appName){
     dispatch_async(dispatch_get_main_queue(), ^{
         @autoreleasepool{
@@ -58,6 +62,7 @@ void showDialogAndTerminate(const string& appName){
     });
 }
 
+// Calculates time limit for application and taks necessary action if required
 void checkUsage(){
     auto current = steady_clock::now();
     int duration = duration_cast<seconds>(current - lastSwitchTime).count();
@@ -83,6 +88,7 @@ void checkUsage(){
     }
 }
 
+// To display live app usage details
 void liveDetails() {
     while(running){
         checkUsage();
@@ -105,7 +111,7 @@ void liveDetails() {
     }
 }
 
-
+//  Handle App switch events and update active app
 void activateAppDidChange(NSNotification *notification){
     auto current = steady_clock::now();
     int duration = duration_cast<seconds>(current - lastSwitchTime).count();
@@ -126,6 +132,7 @@ void activateAppDidChange(NSNotification *notification){
     lastSwitchTime = now;
 }
 
+// Main function
 int main(){
     @autoreleasepool {
         cout << "Application started" << endl;
