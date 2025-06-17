@@ -8,8 +8,9 @@
 
 
 #define MAX_APPS 50
-#define UPDATE_INTERVAL 1000
+#define UPDATE_INTERVAL 1000 // Updated every second
 
+// Structure for each application
 typedef struct{
     char processName[256];
     char appName[256];
@@ -25,6 +26,7 @@ HWND hwndMain, hwndList, hwndTop5List, hwndIncButton, hwndDecButton;
 HINSTANCE hInstance;
 int selectedAppIndex=-1;
 
+// Looking for user-opened application
 BOOL IsUserApplication(DWORD p_id){
     HANDLE process=OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, p_id);
     if (process){
@@ -35,6 +37,7 @@ BOOL IsUserApplication(DWORD p_id){
     return FALSE;
 }
 
+// Converting process names to friendly application names for ease
 void GetFriendlyName(const char *processName, char *friendlyName, int size){
     if(strcmp(processName, "notepad.exe") == 0){
         strncpy(friendlyName, "Notepad", size);
@@ -81,6 +84,7 @@ void GetFriendlyName(const char *processName, char *friendlyName, int size){
     }
 }
 
+// Getting active process names and ids of application
 int GetActiveProcessName(char *processName, int size, DWORD *p_id){
     HWND hwnd= GetForegroundWindow();
     if(hwnd){
@@ -99,6 +103,7 @@ int GetActiveProcessName(char *processName, int size, DWORD *p_id){
     return 0;
 }
 
+// Getting details of AppUsage for a particular process
 AppUsage* GetOrAddAppUsage(const char *processName, DWORD p_id){
     if(strcmp(processName, "AppUsageTracker,exe") == 0 || strcmp(processName,"ShellExperienceHost.exe") ==0 || strcmp(processName, "WindowsTerminal.exe") == 0 || strcmp(processName, "SearchHost.exe") == 0) {
         return NULL;
@@ -120,6 +125,7 @@ AppUsage* GetOrAddAppUsage(const char *processName, DWORD p_id){
     return NULL;
 }
 
+// Making changes in the time limit as per user
 BOOL InputBox(HWND hwndOwner, const char *title, const char *prompt, int *timeLimit){
     char inputBuffer[32];
     sprintf(inputBuffer, "%d", *timeLimit);
@@ -135,10 +141,12 @@ BOOL InputBox(HWND hwndOwner, const char *title, const char *prompt, int *timeLi
     return FALSE;
 }
 
+// Update the top 5 list
 void UpdateTop5List(){
     AppUsage top5[MAX_APPS];
     memcpy(top5, appUsages, appCount * sizeof(AppUsage));
 
+    //Sorting by timeSpent in descending manner
     for(int i=0;i<appCount-1;i++){
         for(int j=i+1;j<appCount;j++){
             if(top5[i].timeSpent < top5[j].timeSpent){
@@ -149,6 +157,7 @@ void UpdateTop5List(){
         }
     }
 
+    // Update top 5 list box
     SendMessage(hwndTop5List, LB_RESETCONTENT, 0, 0);
     for(int i=0;i<5 && i<appCount;i++){
         char buffer[256];
@@ -157,6 +166,7 @@ void UpdateTop5List(){
     }
 }
 
+// Updating usage list
 void UpdateUsageList(){
     char buffer[256];
     SendMessage(hwndTop5List, LB_RESETCONTENT, 0, 0);
@@ -167,6 +177,7 @@ void UpdateUsageList(){
     UpdateTop5List();
 }
 
+// changing time limit for particular application
 void AdjustTimeLimit(int adjustment){
     if (selectedAppIndex >= 0 && selectedAppIndex < appCount){
         appUsages[selectedAppIndex].timeLimit+=adjustment;
@@ -174,6 +185,7 @@ void AdjustTimeLimit(int adjustment){
     }
 }
 
+// Handling warnings in case time limit is exceeded for a specific application
 void HandleAppWarnings(AppUsage *appUsage){
     if(appUsage->timeSpent >= appUsage->timeLimit && !appUsage->popUpShown){
         appUsage->popUpShown = TRUE;
@@ -199,6 +211,7 @@ void HandleAppWarnings(AppUsage *appUsage){
     }
 }
 
+// Handling time adjustments
 void UpdateSelectionAndAdjustTimeLimit(HWND hwnd, WPARAM wParam){
     if(HIWORD(wParam) == LBN_SELCHANGE){
         selectedAppIndex = SendMessage(hwndList, LB_GETCURSEL, 0, 0);
@@ -210,6 +223,7 @@ void UpdateSelectionAndAdjustTimeLimit(HWND hwnd, WPARAM wParam){
     }
 }
 
+// Window Procedure
 LRESULT CALLBACK WindowProcess(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
     switch(uMsg){
         case WM_CREATE:
@@ -273,7 +287,7 @@ LRESULT CALLBACK WindowProcess(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
     return 0;
 }
 
-
+// Main Function
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
     hInstance=hInst;
     const char *CLASS_NAME = "AppUsageTracker";
